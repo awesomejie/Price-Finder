@@ -1,0 +1,9 @@
+Fuzzy Matching with Yhat: http://blog.yhat.com/posts/fuzzy-matching-with-yhat.html
+
+https://rajmak.wordpress.com/2013/04/27/clustering-text-map-reduce-in-python/
+
+k-means on top of EM for text classification
+	http://stackoverflow.com/a/8197401/2956795
+
+k-means is "designed" for Euclidean distance:
+	http://stackoverflow.com/questions/5529625/is-it-possible-to-specify-your-own-distance-function-using-scikit-learn-k-means
