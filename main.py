@@ -45,22 +45,66 @@ def match_model(title, model):
 
     >>> match_model("sony cyber shot dsc w310", "dsc w310")
     MODEL-MATCH:EXACT
+    >>> match_model("sony cyber shot dsc w310x", "dsc w310")
+    NOTMATCH
+
     >>> match_model("sony cyber shot sx130is", "sx130 is")
     MODEL-MATCH:MODEL_NOSPACE
+    >>> match_model("sony cyber shot usx130is", "sx130 is")
+    NOTMATCH
+
     >>> match_model("sony cyber shot sx130 is", "sx130is")
     MODEL-MATCH:TITLE_NOSPACE
+    >>> match_model("sony cyber shot usx130 is", "sx130is")
+    NOTMATCH
     """
 
     if model in title:
+        starts = [m.start() for m in re.finditer(model, title)]
+        for si in starts:
+            ei = si + len(model) - 1
+            if si >= 1 and title[si-1] not in [' ']:
+                return "NOTMATCH"
+            if ei+1 <= len(title)-1 and title[ei+1] not in [' ']:
+                return "NOTMATCH"
         return "MODEL-MATCH:EXACT"
 
     model_nospace = model.replace(" ", "")
     if model_nospace in title:
+        starts = [m.start() for m in re.finditer(model_nospace, title)]
+        for si in starts:
+            ei = si + len(model_nospace) - 1
+            if si >= 1 and title[si-1] not in [' ']:
+                return "NOTMATCH"
+            if ei+1 <= len(title)-1 and title[ei+1] not in [' ']:
+                return "NOTMATCH"
         return "MODEL-MATCH:MODEL_NOSPACE"
 
     # strip all space from title too
     title_nospace = title.replace(" ", "")
     if model_nospace in title_nospace:
+        # for title_nospace, find mapping to index in original string
+        mapping = []
+        tidx = 0
+        for i, v in enumerate(title_nospace):
+            while v != title[tidx]:
+                tidx += 1
+            mapping.append(tidx)
+            tidx += 1
+        assert(tidx == len(title))
+
+        starts = [m.start() for m in re.finditer(model_nospace, title_nospace)]
+        ends = [x+len(model_nospace)-1 for x in starts]
+        # map starts/ends back to indexes in original title
+        starts_orig = [mapping[i] for i in starts]
+        ends_orig = [mapping[i] for i in ends]
+
+        for si in starts_orig:
+            if si >= 1 and title[si-1] not in [' ']:
+                return "NOTMATCH"
+        for ei in ends_orig:
+            if ei+1 <= len(title)-1 and title[ei+1] not in [' ']:
+                return "NOTMATCH"
         return "MODEL-MATCH:TITLE_NOSPACE"
 
     return "NOTMATCH"
@@ -146,6 +190,11 @@ def find_listings_with_matched_manufacturer(df_listings_sorted, product_manuf):
     return sorted(listings_index)
 
 
+def purge_model(model, title, match_result):
+    if match_result == "MODEL-MATCH:EXACT":
+        return title.replace(model, "")
+
+
 def match_product(product, df_listings_sorted):
 
     # 1st time match based on "manufacturer"
@@ -172,9 +221,8 @@ def match_product(product, df_listings_sorted):
     # 2nd time match based on "model"
     for idx in list_idx_1stmatch:
         match_result = match_model(df_listings_sorted.iloc[idx].title, product.model)
-        if match_result == "MODEL-MATCH:EXACT":
-            purge_keyword(model, title)
-            purge_keyword(model, product_name)
+        purge_model(product.model, df_listings_sorted.iloc[idx].title, match_result)
+        purge_model(product.model, product_name)
 
 
 
