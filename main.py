@@ -190,9 +190,60 @@ def find_listings_with_matched_manufacturer(df_listings_sorted, product_manuf):
     return sorted(listings_index)
 
 
-def purge_model(model, title, match_result):
+def purge_model_from_title(model, title, match_result):
+    """
+    >>> purge_model_from_title("dsc w310", "sony cyber shot dsc w310", "MODEL-MATCH:EXACT")
+    sony cyber shot
+    >>> purge_model_from_title("sx130 is", "sony cyber shot sx130is", "MODEL-MATCH:MODEL_NOSPACE")
+    sony cyber shot
+    >>> purge_model_from_title("sx130is", "sony sx130 is cyber sx130is shot sx130 is hello", "MODEL-MATCH:TITLE_NOSPACE")
+    sony  cyber  shot  hello
+
+    :param model:
+    :param title:
+    :param match_result:
+    :return:
+    """
+
     if match_result == "MODEL-MATCH:EXACT":
         return title.replace(model, "")
+    if match_result == "MODEL-MATCH:MODEL_NOSPACE":
+        return title.replace(model.replace(" ",""), "")
+    if match_result == "MODEL-MATCH:TITLE_NOSPACE":
+        model_nospace = model.replace(" ", "")
+        title_nospace = title.replace(" ", "")
+        # for title_nospace, find mapping to index in original string
+        mapping = []
+        tidx = 0
+        for i, v in enumerate(title_nospace):
+            while v != title[tidx]:
+                tidx += 1
+            mapping.append(tidx)
+            tidx += 1
+        assert(tidx == len(title))
+        starts = [m.start() for m in re.finditer(model_nospace, title_nospace)]
+        ends = [x+len(model_nospace)-1 for x in starts]
+        # map starts/ends back to indexes in original title
+        starts_orig = [mapping[i] for i in starts]
+        ends_orig = [mapping[i] for i in ends]
+
+        rt = ""
+        s0 = starts_orig[0]
+        rt += title[:s0]
+        for i in range(len(ends_orig)-1):
+            ei = ends_orig[i]
+            si1 = starts_orig[i+1]
+            rt += title[ei+1:si1]
+        rt += title[ends_orig[-1]+1:]
+        return rt
+
+
+def purge_keyword_from_productname(keyword, productname):
+    if keyword not in productname:
+        print(keyword + " is not in " + productname)
+        return productname
+    else:
+        return productname.replace(keyword, "")
 
 
 def match_product(product, df_listings_sorted):
@@ -219,11 +270,23 @@ def match_product(product, df_listings_sorted):
 
 
     # 2nd time match based on "model"
+    list_idx_2ndmatch = []
     for idx in list_idx_1stmatch:
         match_result = match_model(df_listings_sorted.iloc[idx].title, product.model)
-        purge_model(product.model, df_listings_sorted.iloc[idx].title, match_result)
-        purge_model(product.model, product_name)
+        if match_result == "NOTMATCH":
+            print("%d is not a match" % df_listings_sorted.iloc[idx].name)
+            continue
 
+        # purge model from title
+        df_listings_sorted.iloc[idx].title = purge_model_from_title(product.model, df_listings_sorted.iloc[idx].title, match_result)
+
+        # purge model from product_name
+        # product.product_name = purge_keyword_from_productname(product.model, product.product_name)
+
+        # purge manufacturer from product_name
+        # product.product_name = purge_keyword_from_productname(product.manufacturer, product.product_name)
+
+        print(str(df_listings_sorted.iloc[idx].name) + " " + product.product_name + ":::::::::::" + df_listings_sorted.iloc[idx].title)
 
 
 
