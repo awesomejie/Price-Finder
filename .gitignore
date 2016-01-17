@@ -58,3 +58,6 @@ target/
 
 # IPython notebook
 .ipynb_checkpoints
+
+# editor temporary files
+.idea
