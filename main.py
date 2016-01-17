@@ -409,13 +409,11 @@ if __name__ == '__main__':
 
         # print(json.dumps(result_per_product, indent=2, ensure_ascii=False).encode('utf8'))
 
-        data_per_product = json.dumps(result_per_product, separators=(',', ':'), #indent=2,
+        data_per_product = json.dumps(result_per_product, separators=(',', ':'),  # indent=2,
                                       ensure_ascii=False, encoding='utf8')
         fout.write(data_per_product)
         fout.write(u'\n')
         fout.flush()
-        # if prod_idx == 10:
-        #     break
 
     fout.close()
-    print("Matching completed. Result is stored in output.txt.")
+    print("Matching completed. Result is stored in 'output.txt'.")
