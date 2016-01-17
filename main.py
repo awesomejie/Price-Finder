@@ -15,6 +15,7 @@ include = set('./,')
 exclude -= include
 cachedStopWords = set(stopwords.words("english"))
 
+
 def handle_titles(x):
     """
     Helper function to make string all lowercase and remove punctuation & stopwords.
@@ -28,6 +29,7 @@ def handle_titles(x):
     x = ' '.join(word for word in x.split() if word not in cachedStopWords)
     return x.strip()
 
+
 def handle_products(x):
     """
     pre-process text in product_name or model
@@ -36,8 +38,9 @@ def handle_products(x):
     :return:
     """
     x = x.strip().lower()
-    return re.sub(r'[\W_]', ' ', x).strip()  # replace '_' and all non-alphanumeric with ' '
-                                     # x will only contain [a-z0-9] with ' '
+    ''' replace '_' and all non-alphanumeric with ' '
+        x will only contain [a-z0-9] and ' ' '''
+    return re.sub(r'[\W_]', ' ', x).strip()
 
 
 def match_model(title, model):
@@ -101,7 +104,7 @@ def match_model(title, model):
                 tidx += 1
             mapping.append(tidx)
             tidx += 1
-        assert(tidx == len(title))
+        # assert(tidx == len(title))
 
         starts = [m.start() for m in re.finditer(model_nospace, title_nospace)]
         ends = [x+len(model_nospace)-1 for x in starts]
@@ -120,6 +123,7 @@ def match_model(title, model):
         return "MODEL-MATCH:TITLE_NOSPACE"
 
     return "NOTMATCH"
+
 
 def match_manufacturer(listing_manuf, product_manuf):
     """
@@ -220,7 +224,7 @@ def purge_model_from_title(model, title, match_result):
     if match_result == "MODEL-MATCH:EXACT":
         return title.replace(model, "")
     if match_result == "MODEL-MATCH:MODEL_NOSPACE":
-        return title.replace(model.replace(" ",""), "")
+        return title.replace(model.replace(" ", ""), "")
     if match_result == "MODEL-MATCH:TITLE_NOSPACE":
         model_nospace = model.replace(" ", "")
         title_nospace = title.replace(" ", "")
@@ -232,7 +236,7 @@ def purge_model_from_title(model, title, match_result):
                 tidx += 1
             mapping.append(tidx)
             tidx += 1
-        assert(tidx == len(title))
+        # assert(tidx == len(title))
         starts = [m.start() for m in re.finditer(model_nospace, title_nospace)]
         ends = [x+len(model_nospace)-1 for x in starts]
         # map starts/ends back to indexes in original title
@@ -265,8 +269,7 @@ def match_product(product, df_listings_sorted):
     if product.manufacturer is "":
         list_idx_1stmatch = range(len(df_listings_sorted))
     else:
-        list_idx_1stmatch = find_listings_with_matched_manufacturer\
-            (df_listings_sorted, product.manufacturer)
+        list_idx_1stmatch = find_listings_with_matched_manufacturer(df_listings_sorted, product.manufacturer)
 
     # DEBUG
     # list_idx_1stmatch = find_listings_with_matched_manufacturer\
@@ -283,7 +286,6 @@ def match_product(product, df_listings_sorted):
 
     #print(original_list_idx_1stmatch)
     #print(list_idx_1stmatch)
-
 
     # 2nd time match based on "model"
     list_idx_2ndmatch = []
@@ -304,9 +306,6 @@ def match_product(product, df_listings_sorted):
     else:
         list_idx_3rdmatch = []
         for idx in list_idx_2ndmatch:
-            if product.family is "":
-                list_idx_3rdmatch.append(idx)
-                continue
             match_result = match_model(df_listings_sorted.iloc[idx].title, product.family)
             if match_result == "NOTMATCH":
                 # print("%d is not a match" % df_listings_sorted.iloc[idx].name)
@@ -315,7 +314,7 @@ def match_product(product, df_listings_sorted):
             # print(str(df_listings_sorted.iloc[idx].name) + " " + product.product_name + ":::::::::::" + df_listings_sorted.iloc[idx].title)
             list_idx_3rdmatch.append(idx)
 
-    # 4th time match based on fuzzy score
+    ''' 4th time match based on fuzzy score '''
 
     # purge model and family (if any) from product_name
     # because manufacturer could be "canon" or "canon canada", I do not remove manufacturer from product name or title

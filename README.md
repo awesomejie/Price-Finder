@@ -13,7 +13,14 @@ Here is my Python solution.
 * nltk 3.1 (installed via `sudo pip install -U nltk`)
 
 ## How to test
-Execute the command:
+Git clone the project
+
+```
+git clone https://github.com/awesomejie/Price-Finder.git
+```
+
+Then cd into project folder and execute the command:
+
 ```
 python main.py
 ```
@@ -22,4 +29,4 @@ Results are generated in file "outputs.txt".
 
 It took ~4min on my PC with 8-core and 16G memory for the program to finish matching with the current "listings.txt" and "products.txt".
 
-To test on new data sets, replace "listings.txt" and "products.txt" in the data folder and run `python main.py`.
+To test on new datasets, replace "listings.txt" and "products.txt" in the data folder and run `python main.py`.
