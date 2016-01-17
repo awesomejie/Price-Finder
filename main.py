@@ -5,12 +5,13 @@ from fuzzywuzzy import fuzz
 from nltk.corpus import stopwords
 import json
 import re
-from pprint import pprint
 import string
 import sys
+from collections import OrderedDict
+import io
 
 exclude = set(string.punctuation)
-include = set('.')
+include = set('./,')
 exclude -= include
 cachedStopWords = set(stopwords.words("english"))
 
@@ -21,7 +22,7 @@ def handle_titles(x):
     x: any string
     """
     x = x.strip().lower()
-    x = x.replace('/', ' ')  # replace '/' with space
+    # x = x.replace('/', ' ')  # replace '/' with space
     x = x.replace('-', ' ')  # replace '-' with space
     x = ''.join(ch for ch in x if ch not in exclude)
     x = ' '.join(word for word in x.split() if word not in cachedStopWords)
@@ -47,6 +48,10 @@ def match_model(title, model):
     MODEL-MATCH:EXACT
     >>> match_model("sony cyber shot dsc w310x", "dsc w310")
     NOTMATCH
+    >>> match_model("sony cyber shot dsc w310/x265", "dsc w310")
+    NOTMATCH
+    >>> match_model("sony cyber shot dsc w310  /  x265", "dsc w310")
+    NOTMATCH
 
     >>> match_model("sony cyber shot sx130is", "sx130 is")
     MODEL-MATCH:MODEL_NOSPACE
@@ -59,6 +64,7 @@ def match_model(title, model):
     NOTMATCH
     """
 
+    tuple_fix = ('/', ',')
     if model in title:
         starts = [m.start() for m in re.finditer(model, title)]
         for si in starts:
@@ -66,6 +72,8 @@ def match_model(title, model):
             if si >= 1 and title[si-1] not in [' ']:
                 return "NOTMATCH"
             if ei+1 <= len(title)-1 and title[ei+1] not in [' ']:
+                return "NOTMATCH"
+            if title[:si].strip().endswith(tuple_fix) or title[ei+1:].strip().startswith(tuple_fix):
                 return "NOTMATCH"
         return "MODEL-MATCH:EXACT"
 
@@ -77,6 +85,8 @@ def match_model(title, model):
             if si >= 1 and title[si-1] not in [' ']:
                 return "NOTMATCH"
             if ei+1 <= len(title)-1 and title[ei+1] not in [' ']:
+                return "NOTMATCH"
+            if title[:si].strip().endswith(tuple_fix) or title[ei+1:].strip().startswith(tuple_fix):
                 return "NOTMATCH"
         return "MODEL-MATCH:MODEL_NOSPACE"
 
@@ -104,6 +114,8 @@ def match_model(title, model):
                 return "NOTMATCH"
         for ei in ends_orig:
             if ei+1 <= len(title)-1 and title[ei+1] not in [' ']:
+                return "NOTMATCH"
+        if title[:si].strip().endswith(tuple_fix) or title[ei+1:].strip().startswith(tuple_fix):
                 return "NOTMATCH"
         return "MODEL-MATCH:TITLE_NOSPACE"
 
@@ -240,7 +252,7 @@ def purge_model_from_title(model, title, match_result):
 
 def purge_keyword_from_productname(keyword, productname):
     if keyword not in productname:
-        print(keyword + " is not in " + productname)
+        # print(keyword + " is not in " + productname)
         return productname
     else:
         return productname.replace(keyword, "")
@@ -249,8 +261,12 @@ def purge_keyword_from_productname(keyword, productname):
 def match_product(product, df_listings_sorted):
 
     # 1st time match based on "manufacturer"
-    list_idx_1stmatch = find_listings_with_matched_manufacturer\
-        (df_listings_sorted, product.manufacturer)
+    # assume that manufacturer (in products) is not empty string
+    if product.manufacturer is "":
+        list_idx_1stmatch = range(len(df_listings_sorted))
+    else:
+        list_idx_1stmatch = find_listings_with_matched_manufacturer\
+            (df_listings_sorted, product.manufacturer)
 
     # DEBUG
     # list_idx_1stmatch = find_listings_with_matched_manufacturer\
@@ -274,21 +290,50 @@ def match_product(product, df_listings_sorted):
     for idx in list_idx_1stmatch:
         match_result = match_model(df_listings_sorted.iloc[idx].title, product.model)
         if match_result == "NOTMATCH":
-            print("%d is not a match" % df_listings_sorted.iloc[idx].name)
+            #print("%d is not a match" % df_listings_sorted.iloc[idx].name)
             continue
 
         # purge model from title
         df_listings_sorted.iloc[idx].title = purge_model_from_title(product.model, df_listings_sorted.iloc[idx].title, match_result)
+        # print(str(df_listings_sorted.iloc[idx].name) + " " + product.product_name + ":::::::::::" + df_listings_sorted.iloc[idx].title)
+        list_idx_2ndmatch.append(idx)
 
-        # purge model from product_name
-        # product.product_name = purge_keyword_from_productname(product.model, product.product_name)
+    # 3rd time match based on "family"
+    if product.family is "":
+        list_idx_3rdmatch = list_idx_2ndmatch
+    else:
+        list_idx_3rdmatch = []
+        for idx in list_idx_2ndmatch:
+            if product.family is "":
+                list_idx_3rdmatch.append(idx)
+                continue
+            match_result = match_model(df_listings_sorted.iloc[idx].title, product.family)
+            if match_result == "NOTMATCH":
+                # print("%d is not a match" % df_listings_sorted.iloc[idx].name)
+                continue
+            df_listings_sorted.iloc[idx].title = purge_model_from_title(product.family, df_listings_sorted.iloc[idx].title, match_result)
+            # print(str(df_listings_sorted.iloc[idx].name) + " " + product.product_name + ":::::::::::" + df_listings_sorted.iloc[idx].title)
+            list_idx_3rdmatch.append(idx)
 
-        # purge manufacturer from product_name
-        # product.product_name = purge_keyword_from_productname(product.manufacturer, product.product_name)
+    # 4th time match based on fuzzy score
 
-        print(str(df_listings_sorted.iloc[idx].name) + " " + product.product_name + ":::::::::::" + df_listings_sorted.iloc[idx].title)
+    # purge model and family (if any) from product_name
+    # because manufacturer could be "canon" or "canon canada", I do not remove manufacturer from product name or title
+    product.product_name = purge_keyword_from_productname(product.model, product.product_name)
+    if product.family is not "":
+        product.product_name = purge_keyword_from_productname(product.family, product.product_name)
 
+    list_idx_4thmatch = []
+    for idx in list_idx_3rdmatch:
+        fuzzscore1 = fuzz.partial_ratio(product.product_name, df_listings_sorted.iloc[idx].title)
+        fuzzscore2 = fuzz.token_set_ratio(product.product_name, df_listings_sorted.iloc[idx].title)
+        # print(str(df_listings_sorted.iloc[idx].name) + " " + product.product_name + ":::::::::::" + df_listings_sorted.iloc[idx].title\
+        #       + "::::::" + str(fuzzscore1) + "::::::" + str(fuzzscore2))
+        if fuzzscore1 >= 90 or fuzzscore2 >= 90:
+            # this is a final winner
+            list_idx_4thmatch.append(idx)
 
+    return list_idx_4thmatch
 
 
 if __name__ == '__main__':
@@ -312,8 +357,14 @@ if __name__ == '__main__':
     df_listings = pd.DataFrame(listings, columns=['title', 'manufacturer', 'price', 'currency'])
     df_products = df_products.fillna('')
 
+    # save originals
+    df_products['original_product_name'] = df_products.product_name
+    df_listings['original_title'] = df_listings.title
+    df_listings['original_manufacturer'] = df_listings.manufacturer
+
     df_products['product_name'] = df_products.product_name.apply(handle_products)
     df_products['manufacturer'] = df_products.manufacturer.apply(handle_products)
+    df_products['family'] = df_products.family.apply(handle_products)
     df_products['model'] = df_products.model.apply(handle_products)
     df_listings['title'] = df_listings.title.apply(handle_titles)
     df_listings['manufacturer'] = df_listings.manufacturer.apply(handle_products)
@@ -332,6 +383,38 @@ if __name__ == '__main__':
             break
     #print(index_of_empty_manufacturers)
 
+    fout = io.open("outputs.txt", 'w', encoding='utf8')
+
     for prod_idx, prod_row in df_products.iterrows():
-        match_product(prod_row, df_listings)
-        sys.exit(1)
+        result_per_product = OrderedDict()  # or {}
+        result_per_product['product_name'] = prod_row.original_product_name
+        result_per_product['listings'] = []
+
+        matched_listings = match_product(prod_row, df_listings)
+        original_listings = []
+        for idx in matched_listings:
+            original_listings.append(df_listings.iloc[idx].name)
+        original_listings = sorted(list(set(original_listings)))
+        print(len(original_listings))
+
+        for idx in original_listings:
+            listing = OrderedDict()  # or {}
+            entry = df_listings.loc[idx]
+            listing['title'] = entry.original_title
+            listing['manufacturer'] = entry.original_manufacturer
+            listing['currency'] = entry.currency
+            listing['price'] = entry.price
+            result_per_product['listings'].append(listing)
+
+        # print(json.dumps(result_per_product, indent=2, ensure_ascii=False).encode('utf8'))
+
+        data_per_product = json.dumps(result_per_product, separators=(',', ':'), #indent=2,
+                                      ensure_ascii=False, encoding='utf8')
+        fout.write(data_per_product)
+        fout.write(u'\n')
+        fout.flush()
+        # if prod_idx == 10:
+        #     break
+
+    fout.close()
+    sys.exit(1)
