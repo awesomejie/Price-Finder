@@ -12,7 +12,7 @@ Here is my Python solution.
 * fuzzywuzzy 0.8.0 (installed via `pip install fuzzywuzzy`)
 * nltk 3.1 (installed via `sudo pip install -U nltk`)
 
-## How to test
+## Instructions
 Git clone the project
 
 ```
@@ -25,8 +25,6 @@ Then cd into project folder and execute the command:
 python main.py
 ```
 
-Results are generated in file "outputs.txt". 
-
-It took ~4min on my PC with 8-core and 16G memory for the program to finish matching with the current "listings.txt" and "products.txt".
+That's it. Results in JSON format are generated in file "outputs.txt". 
 
 To test on new datasets, replace "listings.txt" and "products.txt" in the data folder and run `python main.py`.
